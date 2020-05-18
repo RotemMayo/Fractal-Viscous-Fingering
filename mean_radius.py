@@ -31,17 +31,14 @@ import os.path as path
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- Parameters  --- {{{
 from PIL import Image
 from tqdm import tqdm
 
-INPUT_DIR = './data/edge_frames'
+INPUT_DIR = './data/edge_frames/'
 
 #  The x, y coordinates of the pixel located in the center of the inlet fitting.
 #  these depend on the precise location of the camera
 x_center, y_center = 192, 340
-
-# -------------------- }}}
 
 
 # index to number the frames starting from 0
@@ -74,7 +71,7 @@ for image_file_name in tqdm(file_list):
 
     for x in range(0, img_array.shape[0]):
         for y in range(0, img_array.shape[1]):
-            if img_array[x, y] == 255 and (x-x_center) < 0:
+            if img_array[x, y] == 255:
                 x_pos = float(x-x_center)
                 y_pos = float(y-y_center)
                 r = np.sqrt(x_pos**2 + y_pos**2)

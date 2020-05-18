@@ -48,7 +48,7 @@ def _radial_mask(img, x_center, y_center, inner, outer):
     w, h = img.shape
     x, y = np.mgrid[:w, :h]
     radius = (x - x_center) ** 2 + (y - y_center) ** 2
-    return np.where((radius < inner ** 2) | (radius > outer ** 2), 255, img)
+    return np.where((radius < inner ** 2) | (radius > outer ** 2), 0, img)
 
 
 def convert_to_bw():
@@ -57,12 +57,6 @@ def convert_to_bw():
 
     shutil.rmtree(OUTPUT_DIR)
     os.mkdir(OUTPUT_DIR)
-
-    #  The x, y coordinates of the pixel located in the center
-    x_center, y_center = 192, 340
-
-    R_MIN = 0.
-    R_MAX = 147.
 
     CONTRAST = 1.0  # makes the grey scale gradient steeper to better define the edge of the bubble, 1.0 => no change
     SHARPNESS = 1.0  # emphasizes sharp edges of the bubble, 1.0 => no change
@@ -78,7 +72,6 @@ def convert_to_bw():
 
     for image_file_name in tqdm(file_list):
         img = _load_as_greyscale(path.join(INPUT_DIR, image_file_name), CONTRAST, SHARPNESS, BRIGHTNESS)
-        img = _radial_mask(img, x_center, y_center, R_MIN, R_MAX)
         img = _binarize(img, BW_THRESHOLD) * 255
 
         image_file_name = image_file_name.replace(input_extension, '')
@@ -94,6 +87,12 @@ def find_edge():
     shutil.rmtree(OUTPUT_DIR)
     os.mkdir(OUTPUT_DIR)
 
+    #  The TRANSPOSED x, y coordinates of the pixel located in the center
+    x_center, y_center = 340, 192
+
+    R_MIN = 0.
+    R_MAX = 140.
+
     input_extension = '.png'
     file_list = os.listdir(INPUT_DIR)
     file_list = sorted([name for name in file_list if (name.endswith(input_extension) and not name.startswith('.'))])
@@ -104,12 +103,17 @@ def find_edge():
         img = Image.open(path.join(INPUT_DIR, image_file_name))
         img = img.filter(ImageFilter.FIND_EDGES)
 
+        img_array = np.array(img).transpose()
+        img_array = _radial_mask(img_array, x_center, y_center, R_MIN, R_MAX)
+
         image_file_name = image_file_name.replace(input_extension, '')
-        img.save(path.join(OUTPUT_DIR, image_file_name + output_extension), 'png')
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            io.imsave(path.join(OUTPUT_DIR, image_file_name + output_extension), img_array, check_contrast=False)
 
 
 def make_movie():
-    INPUT_DIR = './data/edge_frames'
+    INPUT_DIR = './data/edge_frames/'
     OUTPUT_DIR = './data/output_video/'
 
     shutil.rmtree(OUTPUT_DIR)
