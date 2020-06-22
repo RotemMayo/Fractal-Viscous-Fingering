@@ -52,7 +52,7 @@ def _radial_mask(img, x_center, y_center, inner, outer):
     return np.where((radius < inner ** 2) | (radius > outer ** 2), 0, img)
 
 
-def convert_to_bw(input_directory, output_directory, input_extension):
+def convert_to_bw(input_directory, output_directory, input_extension, x_center, y_center, r_min, r_max):
     """
     Read from input directory all images ending with input extension,
     load as greyscale, binarize and save to output_directory under bw_frames
@@ -79,10 +79,13 @@ def convert_to_bw(input_directory, output_directory, input_extension):
         img = _load_as_greyscale(path.join(input_directory, image_file_name), contrast, sharpness, brightness)
         img = _binarize(img, bw_threshold) * 255
 
+        img_array = np.array(img).transpose()
+        img_array = _radial_mask(img_array, x_center, y_center, r_min, r_max)
+
         image_file_name = image_file_name.replace(input_extension, '')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            io.imsave(path.join(output_directory, image_file_name + output_extension), img)
+            io.imsave(path.join(output_directory, image_file_name + output_extension), img_array)
 
 
 def find_edge(input_directory, output_directory, input_extension, x_center, y_center, r_min, r_max):
