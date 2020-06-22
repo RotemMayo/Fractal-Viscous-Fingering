@@ -4,6 +4,7 @@ from perimiter import calculate_perimiter
 import os
 
 video_names = ['video3_001', 'video5_003', 'video6_001', 'video7_001', 'video8_001', 'video9_001', 'video10_001', 'video11_001']
+# video_names = ['video2_001']
 
 for video_name in video_names:
     print('\n####### Working on: ' + video_name + ' #######')
@@ -24,7 +25,7 @@ for video_name in video_names:
     R_MAX = 300.
 
     print('### Convert to BW ###')
-    convert_to_bw(input_directory, output_directory, input_extension)
+    convert_to_bw(input_directory, output_directory, input_extension, tansposed_x_center, tansposed_y_center, R_MIN, R_MAX)
     print('### Find Edge ###')
     find_edge(output_directory, output_directory, input_extension, tansposed_x_center, tansposed_y_center, R_MIN, R_MAX)
     print('### Add Number Edge ###')
