@@ -45,11 +45,19 @@ def _binarize(image, threshold=128):
     return binary_img
 
 
-def _radial_mask(img, x_center, y_center, inner, outer):
+def _radial_mask_inner(img, x_center, y_center, inner):
     w, h = img.shape
     x, y = np.mgrid[:w, :h]
     radius = (x - x_center) ** 2 + (y - y_center) ** 2
-    return np.where((radius < inner ** 2) | (radius > outer ** 2), 0, img)
+    img[radius < inner ** 2] = 255
+    return img
+
+
+def _radial_mask_outer(img, x_center, y_center, outer):
+    w, h = img.shape
+    x, y = np.mgrid[:w, :h]
+    radius = (x - x_center) ** 2 + (y - y_center) ** 2
+    return np.where((radius > outer ** 2), 0, img)
 
 
 def convert_to_bw(input_directory, output_directory, input_extension, x_center, y_center, r_min, r_max):
@@ -65,10 +73,10 @@ def convert_to_bw(input_directory, output_directory, input_extension, x_center, 
     if not os.path.exists(output_directory):
         os.mkdir(output_directory)
 
-    contrast = 1.0  # makes the grey scale gradient steeper to better define the edge of the bubble, 1.0 => no change
+    contrast = 1.0 # 1.7  # makes the grey scale gradient steeper to better define the edge of the bubble, 1.0 => no change
     sharpness = 1.0  # emphasizes sharp edges of the bubble, 1.0 => no change
-    brightness = 1.5  # lifts the white level to whiter, 1.0 => no change
-    bw_threshold = 150  # A number between 0 (black) - 255 (white).
+    brightness = 1.5 # 4.0  # lifts the white level to whiter, 1.0 => no change
+    bw_threshold = 190 # 100  # A number between 0 (black) - 255 (white).
 
     file_list = os.listdir(input_directory)
     file_list = sorted([name for name in file_list if (name.endswith(input_extension) and not name.startswith('.'))])
@@ -80,7 +88,8 @@ def convert_to_bw(input_directory, output_directory, input_extension, x_center, 
         img = _binarize(img, bw_threshold) * 255
 
         img_array = np.array(img).transpose()
-        img_array = _radial_mask(img_array, x_center, y_center, r_min, r_max)
+        img_array = _radial_mask_inner(img_array, x_center, y_center, r_min)
+        img_array = _radial_mask_outer(img_array, x_center, y_center, r_max)
 
         image_file_name = image_file_name.replace(input_extension, '')
         with warnings.catch_warnings():
@@ -117,7 +126,7 @@ def find_edge(input_directory, output_directory, input_extension, x_center, y_ce
         img = _binarize(img, 200) * 255
 
         img_array = np.array(img).transpose()
-        img_array = _radial_mask(img_array, x_center, y_center, r_min, r_max)
+        # img_array = _radial_mask(img_array, x_center, y_center, r_min, r_max)
 
         image_file_name = image_file_name.replace(input_extension, '')
         with warnings.catch_warnings():
@@ -137,9 +146,10 @@ def add_number(input_directory, output_directory, input_extension, input_type):
     for image_file_name in tqdm(file_list):
         img = Image.open(path.join(input_directory, image_file_name))
         number = image_file_name.rsplit('e')[1].rsplit('.')[0]
+
         draw = ImageDraw.Draw(img)
-        draw.text((700, 700), number, fill=255)
-        img.save(path.join(output_directory, image_file_name))
+        draw.text((990, 990), number, fill=255)
+        img.save(path.join(output_directory, 'frame' + number + input_extension))
 
 
 def make_movie(start_number, input_directory, output_directory, input_type, video_name):

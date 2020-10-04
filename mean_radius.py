@@ -34,106 +34,113 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm
 
-INPUT_DIR = './data/edge_frames/'
 
-#  The x, y coordinates of the pixel located in the center of the inlet fitting.
-#  these depend on the precise location of the camera
-x_center, y_center = 192, 340
+def mean_radius(input_directory, output_directory, input_extension, video_name, tansposed_x_center, tansposed_y_center):
+    input_directory = path.join(input_directory, 'edge_frames')
+    output_directory = path.join(output_directory, 'radius_results')
+    if not os.path.exists(output_directory):
+        os.mkdir(output_directory)
+
+    # index to number the frames starting from 0
+    iframe = 0
+
+    # pick out only tifs and not hidden files.
+    # Files are sorted by frame number as long as only one shot of the camera is in the directory.
+    file_list = os.listdir(input_directory)
+    file_list = sorted([name for name in file_list if (name.endswith(input_extension) and not name.startswith('.'))])
+
+    fplot = []  # frame numbers for plotting
+    rplot = []  # radii
+    stdplot = []  # std dev
+    rmaxplot =[]  # max radius
+    rminplot =[]  # min radius
+
+    jump = 100
+
+    for image_file_name in tqdm(file_list[0::jump]):
+        img = Image.open(path.join(input_directory, image_file_name))
+
+        # the transpose makes the coordinates of images match those of matrices
+        img_array = np.array(img).transpose()
+
+        img.close()
+
+        # make empty lists to hold the pixel radius data
+        radius = []
+
+        for x in range(0, img_array.shape[0]):
+            for y in range(0, img_array.shape[1]):
+                if img_array[x, y] == 255:
+                    x_pos = float(x-tansposed_y_center)
+                    y_pos = float(y-tansposed_x_center)
+                    r = np.sqrt(x_pos**2 + y_pos**2)
+
+                    radius.append(r)
 
 
-# index to number the frames starting from 0
-iframe = 0
+        fplot = fplot + [iframe]
+        rplot = rplot + [np.mean(radius)]
+        # standard deviation is a measure of how noncircular the bubble is.
+        stdplot = stdplot + [np.std(radius)]
 
-# pick out only tifs and not hidden files.
-# Files are sorted by frame number as long as only one shot of the camera is in the directory.
-inext = '.png'
-file_list = os.listdir(INPUT_DIR)
-file_list = sorted([name for name in file_list if (name.endswith(inext) and not name.startswith('.'))])
+        rmaxplot = rmaxplot + [max(radius)]
+        rminplot = rminplot + [min(radius)]
 
-fplot = []  # frame numbers for plotting
-rplot = []  # radii
-stdplot = []  # std dev
-rmaxplot =[]  # max radius
-rminplot =[]  # min radius
+        # go to the next frame
+        iframe += 1
+    np.savetxt(output_directory + '/radius_data.txt', (fplot, rplot, stdplot, rmaxplot, rminplot))
 
+    plt.scatter(fplot, rplot, label='avg radius')
+    plt.scatter(fplot, stdplot, label='std dev')
+    plt.scatter(fplot, rmaxplot, label=r'$R_{max}$')
+    plt.scatter(fplot, rminplot, label= r'$R_{min}$')
+    plt.xlabel('frame number')
+    plt.ylabel('radius (in pixels) ' + video_name)
+    plt.title('Radii ' + video_name)
+    plt.legend(loc='upper left')
 
-for image_file_name in tqdm(file_list):
-    img = Image.open(path.join(INPUT_DIR, image_file_name))
+    plt.savefig(output_directory + '/radii.pdf')
+    plt.show()
 
-    # the transpose makes the coordinates of images match those of matrices
-    img_array = np.array(img).transpose()
+    plt.close()
 
-    img.close()
+    vel = []
+    fps = 50.0
+    for i in range(len(rplot)-2):
+        dr = rplot[i+1] - rplot[i]
+        dt = (1.0/fps)*jump
+        vel = vel + [dr/dt]
 
-    # make empty lists to hold the pixel radius data
-    radius = []
-    angle = []
+    np.savetxt(output_directory + '/vel_data.txt', vel)
 
-    for x in range(0, img_array.shape[0]):
-        for y in range(0, img_array.shape[1]):
-            if img_array[x, y] == 255:
-                x_pos = float(x-x_center)
-                y_pos = float(y-y_center)
-                r = np.sqrt(x_pos**2 + y_pos**2)
+    plt.scatter(list(np.array(range(len(vel))) * (1/fps)*jump), vel, label='vel')
+    plt.xlabel('time (sec)')
+    plt.ylabel('vel')
+    plt.title('vel ' + video_name)
+    plt.legend(loc='upper left')
 
-                radius.append(r)
-                if r != 0.0:   # avoid zero radii, just in case
-                    if x_pos != 0.0:  # avoid a divide by zero situation
-                        angle.append(np.arctan(y_pos / x_pos))   # in radians
-                    else:
-                        if y_pos > 0.0:
-                            angle.append(np.pi/2.0)
-                        else:
-                            angle.append(-np.pi/2.0)
-                else:  # angle is undefined for zero radius: just make it zero
-                    angle = 0.0   # this should never happen
+    plt.savefig(output_directory+'/vel.pdf')
+    plt.show()
 
-    # end of the loop over 1 frame
-
-    # # uses an interquartile radius test to eliminate outliers due to stray black pixels
-    # radius, angle = fvf.kill_outliers(radius, angle)
-
-    fplot = fplot + [iframe]
-    rplot = rplot + [np.mean(radius)]
-    # standard deviation is a measure of how noncircular the bubble is.
-    stdplot = stdplot + [np.std(radius)]
-
-    rmaxplot = rmaxplot + [max(radius)]
-    rminplot = rminplot + [min(radius)]
-
-    # Use a quick plot to check for outliers due to wild stray pixels
-    # these should have been eliminated by kill_outliers function
-    # plt.plot(angle,radius,'.')
+    plt.close()
+    #
+    # time = list(np.array(range(len(rplot))) * (1/fps))
+    # R_fit_coef = np.polyfit(time, rplot, 4)
+    # v_fit_coef = np.polyder(R_fit_coef)
+    #
+    # initial_radius = np.polyval(R_fit_coef, time)[0] #value should be similar to radii[0]
+    # initial_velocity = np.polyval(v_fit_coef, time)[1]
+    #
+    # np.polyval(v_fit_coef, time)
+    #
+    # plt.plot(time, np.polyval(v_fit_coef, time), label='vel')
+    # plt.xlabel('time (sec)')
+    # plt.ylabel('vel')
+    # plt.title('vel2')
+    # plt.legend(loc='upper left')
+    #
+    # plt.savefig(OUTPUT_DIR+'vel2.pdf')
     # plt.show()
-
-    # go to the next frame
-    iframe += 1
-
-# save the data to a file for further analysis later
-OUTPUT_DIR = './data/radius_results/'
-
-np.savetxt(OUTPUT_DIR + '_radius_data.txt', (fplot,rplot,stdplot,rmaxplot,rminplot))
-
-plt.plot(fplot, rplot, label='avg radius')
-plt.plot(fplot, stdplot, label='std dev')
-plt.plot(fplot, rmaxplot, label=r'$R_{max}$')
-plt.plot(fplot, rminplot, label= r'$R_{min}$')
-plt.xlabel('frame number')
-plt.ylabel('radius (in pixels)')
-plt.title('Radii ' + OUTPUT_DIR)
-plt.legend(loc='upper left')
-
-plt.savefig(OUTPUT_DIR+'radii.pdf')
-plt.show()
-
-plt.close()
-
-plt.plot(fplot, rplot, label='avg radius')
-plt.xlabel('frame number')
-plt.ylabel('radius (in pixels)')
-plt.title('Radii ' + OUTPUT_DIR)
-plt.legend(loc='upper left')
-
-plt.savefig(OUTPUT_DIR+'radii_only.pdf')
-plt.show()
-
+    #
+    # plt.close()
+    #
